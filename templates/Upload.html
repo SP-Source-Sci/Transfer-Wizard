@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transfer Wizard</title>
+    <link rel="stylesheet" href="\static\css\styles2.css">
+    <link rel="stylesheet" href="\static\css\styles.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles2.css') }}">
+    <script src="{{ url_for('static', filename='heartbeat.js') }}"></script>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>File Transfer</h1>
+            <p>Drag and drop your files here or click to browse.</p>
+        </header>
+        <section class="upload-area">
+            <div id="drop-zone">
+                <p>Drag & Drop Files Here</p>
+                <input type="file" id="file-input" multiple>
+                <label for="file-input" class="browse-button">Browse Files</label>
+            </div>
+            <div id="progress-container" class="hidden">
+                <h3>Uploading...</h3>
+                <div id="progress-bar">
+                    <div id="progress"></div>
+                </div>
+                <p id="progress-text">0%</p>
+                <p id="speed-text"></p>
+                <p id="time-left-text"></p>
+            </div>
+            <div id="upload-status" class="hidden">
+                <h3>Upload Status</h3>
+                <ul id="status-list">
+                </ul>
+            </div>
+        </section>
+        <div>
+            <a href="/disconnect" class="disconnect-button">Disconnect</a>
+        </div>
+        <footer>
+            <p>&copy; 2025 File Transfer Service</p>
+        </footer>
+    </div>
+
+    <script>
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        const progressContainer = document.getElementById('progress-container');
+        const progressBar = document.getElementById('progress');
+        const progressText = document.getElementById('progress-text');
+        const uploadStatus = document.getElementById('upload-status');
+        const statusList = document.getElementById('status-list');
+        const speedText = document.getElementById('speed-text');
+        const timeLeftText = document.getElementById('time-left-text');
+
+        function handleFiles(files) {
+            if (files.length > 0) {
+                progressContainer.classList.remove('hidden');
+                uploadStatus.classList.add('hidden');
+                statusList.innerHTML = ''; // Clear previous statuses
+                uploadFiles(files);
+            }
+        }
+
+        function updateProgress(percentage) {
+            progressBar.style.width = `${percentage}%`;
+            progressText.textContent = `${percentage.toFixed(0)}%`;
+        }
+
+        function showNotification(message, type = 'success') {
+            const notificationDiv = document.createElement('div');
+            notificationDiv.classList.add('notification', type);
+            notificationDiv.textContent = message;
+            document.body.appendChild(notificationDiv);
+
+            setTimeout(() => {
+                notificationDiv.remove();
+            }, 3000);
+        }
+
+        async function uploadFiles(rawFileList) {
+            // 1. Clone the file list so it survives the input clearing
+            const files = Array.from(rawFileList);
+
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+
+                // 2. Await guarantees sequential uploading (one by one)
+                await new Promise((resolve) => {
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    
+                    try {
+                        const xhr = new XMLHttpRequest();
+                        let startTime = null;
+                        let lastLoaded = 0;
+                        let lastTime = 0;
+                        let lastPercentSent = -1; 
+                        
+                        // Variables declared outside the listener to prevent overwriting
+                        let lastSpeedStr = "Speed: Calculating...";
+                        let lastTimeStr = "Time Left: Calculating...";
+
+                        // Reset Desktop UI for the new file
+                        fetch('/progress', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ percent: 0 })
+                        }).catch(() => {});
+
+                        xhr.upload.addEventListener('progress', (event) => {
+                            if (event.lengthComputable) {
+                                const percentage = (event.loaded / event.total) * 100;
+                                updateProgress(percentage);
+
+                                const currentTime = new Date().getTime();
+                                if (!startTime) {
+                                    startTime = currentTime;
+                                    lastTime = startTime;
+                                    lastLoaded = 0;
+                                }
+
+                                const timeElapsed = currentTime - lastTime;
+                                const bytesUploaded = event.loaded - lastLoaded;
+
+                                // Update speed math only every 100ms
+                                if (timeElapsed > 100) { 
+                                    const speed = bytesUploaded / (timeElapsed / 1000); 
+                                    lastSpeedStr = `Speed: ${formatBytes(speed)}/s`;
+                                    speedText.textContent = lastSpeedStr;
+
+                                    const bytesRemaining = event.total - event.loaded;
+                                    const timeLeftSeconds = bytesRemaining / speed;
+
+                                    if (isFinite(timeLeftSeconds) && speed > 0) {
+                                        lastTimeStr = `Time Left: ${formatTime(timeLeftSeconds)}`;
+                                    } else {
+                                        lastTimeStr = `Time Left: Calculating...`;
+                                    }
+                                    timeLeftText.textContent = lastTimeStr;
+
+                                    lastTime = currentTime;
+                                    lastLoaded = event.loaded;
+                                }
+
+                                // Desktop Sync Reporter
+                                let percentComplete = Math.round(percentage);
+                                if (percentComplete > lastPercentSent) {
+                                    lastPercentSent = percentComplete;
+                                    fetch('/progress', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ 
+                                            percent: percentComplete,
+                                            speed: lastSpeedStr,
+                                            time: lastTimeStr
+                                        })
+                                    }).catch(() => {}); 
+                                }
+                            }
+                        });
+
+                        xhr.onload = () => {
+                            speedText.textContent = '';
+                            timeLeftText.textContent = '';
+                            try {
+                                const response = JSON.parse(xhr.responseText);
+                                const listItem = document.createElement('li');
+
+                                if (xhr.status >= 200 && xhr.status < 300) {
+                                    listItem.textContent = `${file.name}: ${response.message || 'Uploaded successfully'}`;
+                                    statusList.appendChild(listItem);
+                                    showNotification(`${file.name} uploaded successfully!`);
+                                } else {
+                                    listItem.textContent = `${file.name}: Upload failed - ${response.error || 'Unknown error'}`;
+                                    statusList.appendChild(listItem);
+                                    showNotification(`Failed to upload ${file.name}.`, 'error');
+                                }
+                            } catch (error) {
+                                const listItem = document.createElement('li');
+                                listItem.textContent = `${file.name}: Error processing response`;
+                                statusList.appendChild(listItem);
+                            } finally {
+                                resolve(); // Proceed to next file in queue
+                            }
+                        };
+
+                        xhr.onerror = () => {
+                            speedText.textContent = '';
+                            timeLeftText.textContent = '';
+                            showNotification(`Network error uploading ${file.name}.`, 'error');
+                            const listItem = document.createElement('li');
+                            listItem.textContent = `${file.name}: Network error`;
+                            statusList.appendChild(listItem);
+                            resolve(); 
+                        };
+
+                        xhr.open('POST', '/upload');
+                        xhr.send(formData);
+
+                    } catch (error) {
+                        speedText.textContent = '';
+                        timeLeftText.textContent = '';
+                        showNotification(`Error setting up upload for ${file.name}.`, 'error');
+                        const listItem = document.createElement('li');
+                        listItem.textContent = `${file.name}: Error - ${error.message}`;
+                        statusList.appendChild(listItem);
+                        resolve();
+                    }
+                });
+            }
+
+            // 3. Cleanup after all files in the batch are completed
+            progressContainer.classList.add('hidden');
+            uploadStatus.classList.remove('hidden');
+            
+            fetch('/progress', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ percent: 0 })
+            }).catch(() => {});
+        }
+
+        // Helper function to format bytes
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        // Helper function to format seconds
+        function formatTime(seconds) {
+            const hours = Math.floor(seconds / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            const remainingSeconds = Math.floor(seconds % 60);
+            const parts = [];
+            if (hours > 0) parts.push(`${hours} hr`);
+            if (minutes > 0) parts.push(`${minutes} min`);
+            if (remainingSeconds >= 0 || parts.length === 0) parts.push(`${remainingSeconds} sec`);
+            return parts.join(' ');
+        }
+
+        // --- Event Listeners ---
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('dragover');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            handleFiles(files);
+        });
+
+        fileInput.addEventListener('change', () => {
+            handleFiles(fileInput.files);
+            fileInput.value = ''; // Safe to clear now because we clone the array!
+        });
+
+        // --- Emergency Cleanup: If user reloads or closes tab ---
+        window.addEventListener('pagehide', () => {
+            const data = JSON.stringify({ percent: 0 });
+            const blob = new Blob([data], { type: 'application/json' });
+            navigator.sendBeacon('/progress', blob);
+        });
+    </script>
+</body>
+</html>
