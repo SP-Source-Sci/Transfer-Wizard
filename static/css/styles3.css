@@ -1,0 +1,113 @@
+/* Specific styles for the receive page */
+.receive-area {
+    background-color: #f9f9f9;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 30px;
+    margin-top: 20px;
+    text-align: center;
+}
+
+.shareable-link-panel {
+    margin-bottom: 30px;
+}
+
+.link-container {
+    display: flex;
+    align-items: center;
+    margin-top: 10px;
+}
+
+#receive-link {
+    flex-grow: 1;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px 0 0 4px;
+    font-size: 1rem;
+    cursor: text;
+}
+
+#copy-link-button {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    padding: 10px 15px;
+    border-radius: 0 4px 4px 0;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: background-color 0.3s ease;
+}
+
+#copy-link-button:hover {
+    background-color: #0056b3;
+}
+
+.instruction {
+    color: #777;
+    font-size: 0.9rem;
+    margin-top: 10px;
+}
+
+#incoming-uploads-panel,
+#receive-notification-panel {
+    margin-top: 20px;
+    padding: 20px;
+    background-color: #e9ecef;
+    border-radius: 6px;
+    text-align: left;
+}
+
+#incoming-uploads-panel h3,
+#receive-notification-panel h3 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    color: #333;
+}
+
+#incoming-list,
+#receive-notification-list {
+    list-style: none;
+    padding: 0;
+}
+
+#incoming-list li {
+    padding: 10px 0;
+    border-bottom: 1px solid #ccc;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+#incoming-list li:last-child {
+    border-bottom: none;
+}
+
+.upload-progress-bar-container {
+    background-color: #ddd;
+    border-radius: 5px;
+    height: 8px;
+    width: 70%;
+    overflow: hidden;
+    margin-left: 10px;
+}
+
+.upload-progress-bar {
+    background-color: #28a745;
+    height: 100%;
+    width: 0%;
+    border-radius: 5px;
+    transition: width 0.3s ease-in-out;
+}
+
+#receive-notification-list li {
+    padding: 8px 0;
+    border-bottom: 1px solid #ccc;
+}
+
+#receive-notification-list li:last-child {
+    border-bottom: none;
+}
+
+.hidden {
+    display: none;
+}

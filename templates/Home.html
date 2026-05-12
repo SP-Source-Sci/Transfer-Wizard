@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transfer Wizard</title>
+    <link rel="stylesheet" href="\static\css\styles.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <div class="homepage-container">
+        <header>
+            <h1>Welcome to File Transfer</h1>
+            <p>Choose how you want to transfer files.</p>
+        </header>
+        <main>
+            <div class="button-container">
+                <a href="/Send" class="button send-button">Send Files</a>
+                <a href="/snd" class="button receive-button">Receive Files</a>
+            </div>
+        </main>
+        <footer>
+            <p>&copy; 2025 File Transfer Service</p>
+        </footer>
+    </div>
+</body>
+</html>
